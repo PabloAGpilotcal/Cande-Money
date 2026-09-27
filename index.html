@@ -6,8 +6,8 @@
 <title>Cande Money</title>
 <!--PWA-->
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/png" href="icons/favicon.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#F4F8FC">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -174,6 +174,14 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .firma .tel svg{width:20px;height:20px}
 .firma .amo{font-family:"Dancing Script","Brush Script MT",cursive;font-size:2.1rem;color:var(--brand);margin:16px 0 0;line-height:1.1}
 .firma .corazon{width:150px;height:auto;display:block;margin:4px auto 0}
+.instalar{background:var(--plum-soft);border:1px solid color-mix(in srgb,var(--plum) 35%,var(--line));border-radius:var(--radius-m);padding:14px 16px;margin-bottom:14px;position:relative}
+.instalar h3{margin:0 30px 6px 0;font-size:1rem}
+.instalar p,.instalar ol{margin:0;font-size:.92rem}
+.instalar ol{padding-left:20px}
+.instalar li{margin:4px 0}
+.instalar .ib{margin-top:10px;background:var(--plum);color:var(--on-plum);border:0;border-radius:10px;padding:11px 16px;font-weight:700;min-height:44px}
+.instalar .cerrar{position:absolute;top:8px;right:8px;background:none;border:0;color:var(--muted);width:34px;height:34px;font-size:1.3rem;line-height:1}
+.instalar svg{width:18px;height:18px;vertical-align:-3px}
 .hidden{display:none !important}
 @media (max-width:370px){.cajas{grid-template-columns:1fr 1fr}.filters{grid-template-columns:1fr 1fr}.hero .amount{font-size:2.2rem}}
 </style>
@@ -187,6 +195,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 
   <!-- INICIO -->
   <section id="v-inicio">
+    <div class="instalar hidden" id="instalar" role="region" aria-label="Instalar la app"></div>
     <div class="hero" id="hero"></div>
     <div class="cajas" id="cajas"></div>
     <p class="propia" id="propia"></p>
@@ -872,6 +881,49 @@ $("#b-reset").addEventListener("click",()=>{
 if(!window.claude && "serviceWorker" in navigator && location.protocol==="https:"){
   window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 }
+
+/* ---------- Ayuda para instalar (solo fuera de Claude) ---------- */
+(function(){
+  if(window.claude) return;
+  const box=$("#instalar");
+  const standalone = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone===true;
+  if(standalone) return;
+  try{ if(localStorage.getItem("cm-no-instalar")==="1") return; }catch(e){}
+  const ua=navigator.userAgent;
+  const isIOS=/iphone|ipad|ipod/i.test(ua) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+  const isAndroid=/android/i.test(ua);
+  const enApp=/FBAN|FBAV|Instagram|WhatsApp|Line\/|GSA\/|TikTok/i.test(ua);
+  const otroNavIOS=/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
+  const samsung=/SamsungBrowser/i.test(ua);
+  const share='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M8 7l4-4 4 4M6 11H5v10h14V11h-1"/></svg>';
+  const cerrar='<button class="cerrar" aria-label="Ocultar este aviso" id="inst-x">×</button>';
+  function mostrar(html){ box.innerHTML=cerrar+html; box.classList.remove("hidden");
+    $("#inst-x").onclick=()=>{ box.classList.add("hidden"); try{localStorage.setItem("cm-no-instalar","1")}catch(e){} }; }
+  if(isIOS){
+    if(enApp || otroNavIOS){
+      mostrar('<h3>Abrila en Safari para instalarla</h3><p>Desde acá el iPhone no deja instalarla. Copiá el link y pegalo en <b>Safari</b> (la brújula azul). Si ves un ícono de brújula o “Abrir en Safari” abajo, tocalo.</p><button class="ib" id="inst-copiar">Copiar link</button>');
+      $("#inst-copiar").onclick=async()=>{ try{ await navigator.clipboard.writeText(location.href); toast("Link copiado"); }catch(e){ toast(location.href); } };
+    } else {
+      mostrar('<h3>Instalá Cande Money en tu iPhone</h3><ol><li>Tocá el botón <b>Compartir</b> '+share+' (abajo en el medio, o arriba a la derecha en iPad).</li><li>Deslizá para abajo y tocá <b>Agregar a inicio</b>.</li><li>Tocá <b>Agregar</b>. Listo, queda con tu ícono.</li></ol>');
+    }
+    return;
+  }
+  let promptEv=null;
+  window.addEventListener("beforeinstallprompt",e=>{
+    e.preventDefault(); promptEv=e;
+    mostrar('<h3>Instalá Cande Money</h3><p>Queda como una app en tu celular, con su ícono.</p><button class="ib" id="inst-ok">Instalar</button>');
+    $("#inst-ok").onclick=async()=>{ promptEv.prompt(); const r=await promptEv.userChoice.catch(()=>null); if(r&&r.outcome==="accepted") box.classList.add("hidden"); promptEv=null; };
+  });
+  window.addEventListener("appinstalled",()=>{ box.classList.add("hidden"); toast("¡Instalada!"); });
+  if(isAndroid){
+    setTimeout(()=>{
+      if(promptEv) return;
+      if(enApp) mostrar('<h3>Abrila en Chrome para instalarla</h3><p>Tocá los tres puntitos <b>⋮</b> arriba a la derecha y elegí <b>Abrir en Chrome</b> (o “Abrir en el navegador”).</p>');
+      else if(samsung) mostrar('<h3>Instalá Cande Money</h3><ol><li>Tocá el menú <b>≡</b> abajo a la derecha.</li><li>Elegí <b>Agregar página a</b> → <b>Pantalla de inicio</b>.</li></ol>');
+      else mostrar('<h3>Instalá Cande Money</h3><ol><li>Tocá los tres puntitos <b>⋮</b> arriba a la derecha.</li><li>Elegí <b>Instalar app</b> o <b>Agregar a la pantalla principal</b>.</li><li>Confirmá con <b>Instalar</b>.</li></ol>');
+    },3500);
+  }
+})();
 
 /* ---------- Inicio ---------- */
 cargarLocal();
